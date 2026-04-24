@@ -1,6 +1,6 @@
-name: astrbot-plugin-AvatarRecognition # 插件唯一识别名，以 astrbot_plugin_ 前缀开头
+name: astrbot_plugin_avatar_recognition
 display_name: 头像识别工具
 desc: 用于识别QQ用户头像，可能可用于和其他画图插件联动。
 version: v1.0
-author: Soulter # 作者
+author: Soulter
 repo: https://github.com/204343414/astrbot-plugin-AvatarRecognition
