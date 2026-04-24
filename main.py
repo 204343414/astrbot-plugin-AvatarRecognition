@@ -26,7 +26,9 @@ class AvatarDescriber(Star):
         self.max_cached_images = config.get("max_cached_images", 5)
 
         # 指定的识图 Provider ID
-        self.image_desc_provider_id = config.get("image_desc_provider", "").strip()
+        # 从系统配置中读取“默认图片转述模型”的提供商 ID
+        self.default_image_caption_provider_id = context.get_current_config().get("provider_settings", {}).get("default_image_caption_provider_id", "")
+        logger.info(f"avatar_describer 初始化，系统默认图片转述模型ID为: {self.default_image_caption_provider_id or '未设置'}")
 
         # 临时文件目录
         shared_data_path = Path(__file__).resolve().parent.parent.parent
@@ -85,30 +87,34 @@ class AvatarDescriber(Star):
         if not avatar_path:
             return json.dumps({"description": "无法获取用户头像，请稍后重试。", "cached": False}, ensure_ascii=False)
 
-        # 2. 选择识图 Provider
+        # 2. 选择识图 Provider（优先系统默认图片转述模型）
         provider = None
-        if self.image_desc_provider_id:
-            provider = self.context.get_provider_by_id(self.image_desc_provider_id)
+        if self.default_image_caption_provider_id:
+            provider = self.context.get_provider_by_id(self.default_image_caption_provider_id)
             if not provider:
-                logger.warning(f"未找到配置的识图 Provider: {self.image_desc_provider_id}，尝试回退到当前对话模型。")
-
-        if not provider:
-            provider = self.context.get_using_provider(umo=event.unified_msg_origin)
+                logger.warning(f"系统默认图片转述模型配置有误或未找到: {self.default_image_caption_provider_id}")
 
         # 3. 进行识图
         if not provider:
-            description = "（无法调用视觉模型，请检查 avatar_describer 插件的 image_desc_provider 配置）"
+            description = "无法调用视觉模型，请检查系统配置中的“默认图片转述模型”。"
         else:
-            prompt = "Please describe the image using Chinese."
+            prompt = "请用简洁的中文描述这张头像图片的内容，包括主要元素、风格、角色特征等。不要超过100字。"
             try:
                 llm_resp = await provider.text_chat(
                     prompt=prompt,
                     image_urls=[avatar_path]
                 )
                 description = llm_resp.completion_text.strip() if llm_resp and hasattr(llm_resp, "completion_text") else "识别失败"
+                # 记录成功日志（可选）
+                logger.info(f"头像识图成功: {description[:30]}...")
             except Exception as e:
-                logger.error(f"识图调用失败: {e}", exc_info=True)
-                description = "图像识别出错，请稍后重试。"
+                error_msg = str(e)
+                logger.error(f"识图调用失败: {error_msg}", exc_info=True)
+                # 针对 Gemini 安全策略拦截给出友好提示
+                if "违反 Gemini 平台政策" in error_msg or "SAFETY" in error_msg.upper():
+                    description = "头像识别暂时被安全策略拦截，请稍后再试或换个头像~"
+                else:
+                    description = "图像识别出错，请稍后重试。"
 
         # 4. 缓存头像（供画图工具引用）
         cached = False
