@@ -9,5 +9,11 @@
     "type": "int",
     "default": 5,
     "hint": "每个会话（群聊/私聊）最多缓存多少张图片。"
+  },
+  "image_desc_provider": {
+    "description": "用于识图的 Provider ID",
+    "type": "string",
+    "default": "",
+    "hint": "填入 AstrBot 中配置的图片转述模型 ID，例如 gemini_default_source/gemini-3.1-flash-lite-preview。留空则尝试使用当前对话模型。"
   }
 }
