@@ -107,7 +107,7 @@ class AvatarDescriber(Star):
         if not provider:
             description = "无法调用视觉模型，请检查插件配置中的识图模型。"
         else:
-            prompt = "请用简洁的中文描述这张头像图片的内容，包括主要元素、风格、角色特征等。不要超过100字。"
+            prompt = "Please describe the image using Chinese."
             try:
                 llm_resp = await provider.text_chat(
                     prompt=prompt,
