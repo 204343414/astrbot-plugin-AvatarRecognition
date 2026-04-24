@@ -2,12 +2,19 @@
   "robot_self_id": {
     "description": "机器人自身的 QQ 号",
     "type": "string",
-    "hint": "用于缓存头像，使其可以被其他插件引用。"
+    "hint": "用于缓存头像，使其可以被其他插件（如画图插件）引用。"
   },
   "max_cached_images": {
     "description": "最大缓存图片数",
     "type": "int",
     "default": 5,
-    "hint": "每个会话最多缓存多少张图片。"
+    "hint": "每个会话（群聊/私聊）最多缓存多少张图片。"
+  },
+  "image_desc_provider": {
+    "description": "识图模型",
+    "type": "string",
+    "default": "",
+    "hint": "选择用于识别头像的视觉模型（推荐 Gemini 系列）",
+    "_special": "select_provider"
   }
 }
