@@ -46,6 +46,9 @@ class AvatarDescriber(Star):
             logger.info("avatar_describer: 未配置专门的识图 Provider，将回退到当前对话模型。")
         else:
             logger.info(f"avatar_describer: 使用识图 Provider: {self.image_desc_provider_id}")
+        # 从系统配置中读取“默认图片转述模型”的提供商 ID
+        self.default_image_caption_provider_id = context.get_current_config().get("provider_settings", {}).get("default_image_caption_provider_id", "")
+        logger.info(f"avatar_describer 初始化，系统默认图片转述模型ID为: {self.default_image_caption_provider_id or '未设置'}")
 
     def store_avatar_to_bot_history(self, group_id: str, image_path: str, original_filename: Optional[str] = None):
         """将头像图片以机器人身份存入缓存，供其他插件通过 reference_bot 引用。"""
