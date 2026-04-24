@@ -18,26 +18,27 @@ import json
 class AvatarDescriber(Star):
     def __init__(self, context: Context, config: dict):
         super().__init__(context)
-        self.config = config
-
-        # 机器人自身的 ID（用于缓存头像，方便其他工具引用）
+    
+        # 从配置里读取 robot_self_id，如果没有填写则会给一个空字符串
         self.robot_id = config.get("robot_self_id", "")
-        if not self.robot_id:
-            logger.warning("avatar_describer: 未配置 robot_self_id，头像缓存功能将无法正常使用。")
-
-        # 临时文件目录
+    
+        # 读取最大缓存图片数，默认5张
+        self.max_cached_images = config.get("max_cached_images", 5)
+    
+        # 临时文件目录（和之前一样）
         shared_data_path = Path(__file__).resolve().parent.parent.parent
         self.temp_dir = os.path.join(shared_data_path, "avatar_describer_temp")
         os.makedirs(self.temp_dir, exist_ok=True)
-
-        # 头像图片缓存（结构与画图插件相似，方便联动）
-        # key: (robot_id, group_id) -> deque[(image_path, optional filename)]
-        self.image_history_cache: Dict[Tuple[str, str], deque[Tuple[str, Optional[str]]]] = {}
-        self.max_cached_images = config.get("max_cached_images", 5)
-
-        # 可选：描述缓存，避免对同一头像反复调用视觉模型
-        # key: user_id -> (avatar_url, description, timestamp)
+    
+        # 图片缓存容器
+        from collections import deque
+        self.image_history_cache = {}
+        # 可选的头像描述缓存
         self.desc_cache = {}
+    
+        # 如果没配置机器人QQ号，打一条日志提醒
+        if not self.robot_id:
+            logger.warning("avatar_describer: 未配置 robot_self_id，头像将无法被画图插件引用。")
 
     def store_avatar_to_bot_history(self, group_id: str, image_path: str, original_filename: Optional[str] = None):
         """将头像图片以机器人身份存入缓存，供其他插件通过 reference_bot 引用。"""
