@@ -25,30 +25,27 @@ class AvatarDescriber(Star):
         # 最大缓存图片数
         self.max_cached_images = config.get("max_cached_images", 5)
 
-        # 指定的识图 Provider ID
-        # 从系统配置中读取“默认图片转述模型”的提供商 ID
-        self.default_image_caption_provider_id = context.get_current_config().get("provider_settings", {}).get("default_image_caption_provider_id", "")
-        logger.info(f"avatar_describer 初始化，系统默认图片转述模型ID为: {self.default_image_caption_provider_id or '未设置'}")
+        # 直接读取 AstrBot 全局配置中的“默认图片转述模型”
+        astrbot_config = context.astrbot_config
+        self.default_image_caption_provider_id = (
+            astrbot_config.get("provider_settings", {})
+            .get("default_image_caption_provider_id", "")
+        )
+        logger.info(
+            f"avatar_describer 初始化，系统默认图片转述模型ID为: {self.default_image_caption_provider_id or '未设置'}"
+        )
 
         # 临时文件目录
         shared_data_path = Path(__file__).resolve().parent.parent.parent
         self.temp_dir = os.path.join(shared_data_path, "avatar_describer_temp")
         os.makedirs(self.temp_dir, exist_ok=True)
 
-        # 图片缓存容器
+        # 图片缓存容器（结构与画图插件一致）
         self.image_history_cache = {}
         self.desc_cache = {}
 
-        # 提示日志
         if not self.robot_id:
             logger.warning("avatar_describer: 未配置 robot_self_id，头像无法被画图插件引用。")
-        if not self.image_desc_provider_id:
-            logger.info("avatar_describer: 未配置专门的识图 Provider，将回退到当前对话模型。")
-        else:
-            logger.info(f"avatar_describer: 使用识图 Provider: {self.image_desc_provider_id}")
-        # 从系统全局配置读取“默认图片转述模型”
-        self.default_image_caption_provider_id = context.astrbot_config.get("provider_settings", {}).get("default_image_caption_provider_id", "")
-        logger.info(f"avatar_describer 初始化，系统默认图片转述模型ID为: {self.default_image_caption_provider_id or '未设置'}")
 
     def store_avatar_to_bot_history(self, group_id: str, image_path: str, original_filename: Optional[str] = None):
         """将头像图片以机器人身份存入缓存，供其他插件通过 reference_bot 引用。"""
@@ -90,14 +87,14 @@ class AvatarDescriber(Star):
         if not avatar_path:
             return json.dumps({"description": "无法获取用户头像，请稍后重试。", "cached": False}, ensure_ascii=False)
 
-        # 2. 选择识图 Provider（优先系统默认图片转述模型）
+        # 2. 优先使用系统默认图片转述模型
         provider = None
         if self.default_image_caption_provider_id:
             provider = self.context.get_provider_by_id(self.default_image_caption_provider_id)
             if not provider:
                 logger.warning(f"系统默认图片转述模型配置有误或未找到: {self.default_image_caption_provider_id}")
 
-        # 3. 进行识图
+        # 3. 识图
         if not provider:
             description = "无法调用视觉模型，请检查系统配置中的“默认图片转述模型”。"
         else:
@@ -108,8 +105,6 @@ class AvatarDescriber(Star):
                     image_urls=[avatar_path]
                 )
                 description = llm_resp.completion_text.strip() if llm_resp and hasattr(llm_resp, "completion_text") else "识别失败"
-                # 记录成功日志（可选）
-                logger.info(f"头像识图成功: {description[:30]}...")
             except Exception as e:
                 error_msg = str(e)
                 logger.error(f"识图调用失败: {error_msg}", exc_info=True)
