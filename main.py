@@ -68,32 +68,41 @@ class AvatarDescriber(Star):
             return None
 
     @filter.llm_tool(name="describe_user_avatar")
-    async def describe_user_avatar(self, event: AstrMessageEvent) -> str:
+    async def describe_user_avatar(self, event: AstrMessageEvent, target_user_id: str = "") -> str:
         '''
-        获取当前聊天用户的头像并进行内容识别，返回头像的文字描述。
+        获取指定QQ用户的头像并进行内容识别，返回文字描述。
+        如果不提供target_user_id参数，则默认获取当前聊天用户的头像。
         该工具同时会将头像图片缓存，以便后续调用绘图工具（如 gemini_draw）时通过
         reference_bot=True 及 image_index 引用该头像作为生图参考。
         返回格式：JSON，包含 "description" 字段（中文描述）与 "cached" 字段（是否缓存成功）。
         若识别失败也会返回错误提示。
+    
+        Args:
+            target_user_id (string, optional): 要查询的QQ号。如果留空则使用当前发送消息的用户。
         '''
-        user_id = event.get_sender_id()
+        # 如果没有指定目标 QQ，就用当前发送者
+        if not target_user_id or not target_user_id.strip():
+            user_id = event.get_sender_id()
+        else:
+            user_id = target_user_id.strip()
+    
         group_id = event.get_group_id() if hasattr(event, "message_obj") and event.message_obj.group_id else user_id
-
+    
         # 1. 下载头像
         avatar_path = await self.download_avatar(user_id)
         if not avatar_path:
             return json.dumps({"description": "无法获取用户头像，请稍后重试。", "cached": False}, ensure_ascii=False)
-
-        # 2. 选择识图 Provider（优先使用插件配置的模型，否则用当前对话模型）
+    
+        # 2. 选择识图 Provider
         provider = None
         if self.image_desc_provider_id:
             provider = self.context.get_provider_by_id(self.image_desc_provider_id)
             if not provider:
                 logger.warning(f"未找到配置的识图模型: {self.image_desc_provider_id}，尝试回退到当前对话模型。")
-
+    
         if not provider:
             provider = self.context.get_using_provider(umo=event.unified_msg_origin)
-
+    
         # 3. 识图
         if not provider:
             description = "无法调用视觉模型，请检查插件配置中的识图模型。"
@@ -112,13 +121,13 @@ class AvatarDescriber(Star):
                     description = "头像识别暂时被安全策略拦截，请稍后再试或换个头像~"
                 else:
                     description = "图像识别出错，请稍后重试。"
-
+    
         # 4. 缓存头像（供画图工具引用）
         cached = False
         if self.robot_id and avatar_path and os.path.exists(avatar_path):
             self.store_avatar_to_bot_history(str(group_id), avatar_path, f"avatar_{user_id}.png")
             cached = True
-
+    
         return json.dumps({
             "description": description,
             "cached": cached
